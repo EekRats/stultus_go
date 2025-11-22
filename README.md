@@ -1,10 +1,16 @@
-# Search Engine
+# 🔍 Search Engine
 
-We're building a search engine!
+> ⚠️ This project is in a very primative state 🚧
 
-Todo:
-    [ ] - Frontend
-    [ ] - Tokenizers
-    [ ] - Scoring
-    [ ] - Web crawling
-    [ ] - Naming
+We're building a search engine! 
+
+
+We're looking for name ideas so please sugest something.
+
+## Todo:
+
+- [ ] Frontend
+- [ ] Tokenizers
+- [ ] Scoring
+- [ ] Web crawling
+- [ ] Naming
