@@ -27,3 +27,4 @@ Cool features to add:
 Indexes to index:
 
 - Kagi list of small blogs (these are rss files, need to parse those) - https://github.com/kagisearch/smallweb/blob/main/smallweb.txt
+- DNS records of all URLs
