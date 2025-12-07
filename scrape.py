@@ -35,7 +35,7 @@ while len(urls_queue)>0:
     url = urls_queue.pop(0)
 
     if url in scraped_urls:
-        continuep
+        continue
     elif scraper.get_base_domain(url) == scraper.get_base_domain(urls_queue[0]):
         # This makes sure we don't hammer a single domain with a bunch of requests, it doesn't scrape the same domain twice in a row
         # But this also means that if there is only one domain left in the queue, it will never scrape and the process will continue in an infinite loop
