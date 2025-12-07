@@ -143,7 +143,7 @@ def get_main_text(url):
         'User-Agent': 'SearchEngineProjectBot/1.0 (+https://github.com/ThisIsNotANamepng/search_engine; hagenjj4111@uwec.edu)',
         'From': 'hagenjj4111@uwec.edu'
     }
-    return(text_from_html(requests.get(url, headers=headers).content), url)
+    return(text_from_html(requests.get(url, headers=headers).content, url))
 
 def log(message):
     with open("scraper.log", "a") as f:
@@ -188,7 +188,7 @@ def store(url):
     tokens = tokenizer.tokenize_all(text)
     
     if text:
-        print("Storing article text")
+        #print("Storing article text")
         
         connection = sqlite3.connect(DATABASE_PATH)
         cursor = connection.cursor()

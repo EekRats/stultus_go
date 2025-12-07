@@ -5,8 +5,8 @@ from nltk.util import bigrams
 from nltk.util import trigrams
 from nltk.corpus import stopwords
 
-#nltk.download('punkt', quiet=True)
-#nltk.download('stopwords')
+nltk.download('punkt', quiet=True)
+nltk.download('stopwords', quiet=True)
 
 STOP_WORDS = list(stopwords.words('english'))
 
