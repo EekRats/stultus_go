@@ -15,6 +15,7 @@ import scraper
 import time
 
 SLEEP_TIME = 2  # seconds between requests to avoid hammering servers
+TIMEOUT_TIME = 10  # seconds to wait for fetching a page before skipping
 
 scraper.create_database()
 
@@ -40,7 +41,7 @@ while True:
     timed = time.time()
     
     url = scraper.pop_next_url()
-    print(url)
+    #print(url)
     #print(2, time.time()-timed)
     timed = time.time()
 
@@ -54,32 +55,34 @@ while True:
     #print(3, time.time()-timed)
     timed = time.time()
 
-
     if scraper.exists(url, 'url'):
         continue
 
     #print(4, time.time()-timed)
     timed = time.time()
 
-
     try:
-        links_to_scrape = scraper.store(url)
+        # enforce a network/read timeout for page fetch and parsing
+        links_to_scrape = scraper.store(url, timeout=TIMEOUT_TIME)
         #print(5, time.time()-timed)
         timed = time.time()
         total_links=0
 
         links_to_add_to_queue = []
+        # Clean, deduplicate and filter links in bulk for performance
+        raw_links = [i for i in links_to_scrape if "mailto:" not in i]
 
+        seen = set()
+        cleaned = []
+        for link in raw_links:
+            total_links += 1
+            clean_link = link.split('?', 1)[0]
+            if clean_link not in seen:
+                seen.add(clean_link)
+                cleaned.append(clean_link)
 
-        for i in links_to_scrape:
-            total_links+=1
-
-            # Logic to filter out urls we don't want
-            if not scraper.exists(i, 'url') and "mailto:" not in i:
-
-                clean_url = url.split('?', 1)[0] # Takes out post data
-
-                links_to_add_to_queue.append(clean_url)
+        # filter_new_urls checks both the queue and stored urls in one go
+        links_to_add_to_queue = scraper.filter_new_urls(cleaned)
 
         scraper.enqueue_urls(links_to_add_to_queue)
 

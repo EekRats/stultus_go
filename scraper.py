@@ -187,7 +187,12 @@ def allowed_by_robots(url, user_agent):
 	return rp.can_fetch(user_agent, url)
 
 
-def get_main_text(url):
+def get_main_text(url, timeout=None):
+	"""Fetch URL and extract visible text and links.
+
+	`timeout` is passed to `requests.get` (both connect and read timeout).
+	On network errors or timeouts, returns empty text and empty links list.
+	"""
 	if not allowed_by_robots(url, USER_AGENT):
 		log(f"Blocked by robots.txt: {url}")
 		return "", []
@@ -196,7 +201,11 @@ def get_main_text(url):
 		"User-Agent": USER_AGENT,
 		"From": "hagenjj4111@uwec.edu"
 	}
-	r = requests.get(url, headers=headers)
+	try:
+		r = requests.get(url, headers=headers, timeout=timeout)
+	except requests.exceptions.RequestException as e:
+		log(f"HTTP error fetching {url}: {e}")
+		return "", []
 	return text_from_html(r.content, url)
 
 
@@ -236,8 +245,12 @@ def get_base_domain(url):
 	return host
 
 
-def store(url):
-	text, links = get_main_text(url)
+def store(url, timeout=None):
+	"""Store the page at `url` and return discovered links.
+
+	If `timeout` is provided it is forwarded to HTTP fetch.
+	"""
+	text, links = get_main_text(url, timeout=timeout)
 
 	tokens = tokenizer.tokenize_all(text)
 
@@ -473,21 +486,57 @@ def enqueue_urls(urls):
 	conn.close()
 """
 def enqueue_urls(urls):
-    conn = get_conn()
-    cur = conn.cursor()
+	if not urls:
+		return
 
-    query = """
-        INSERT INTO url_queue (url)
-        VALUES %s
-        ON CONFLICT (url) DO NOTHING;
-    """
+	conn = get_conn()
+	cur = conn.cursor()
 
-    # execute_values handles building the bulk values list efficiently
-    execute_values(cur, query, [(u,) for u in urls])
+	query = """
+		INSERT INTO url_queue (url)
+		VALUES %s
+		ON CONFLICT (url) DO NOTHING;
+	"""
 
-    conn.commit()
-    cur.close()
-    conn.close()
+	# execute_values handles building the bulk values list efficiently
+	execute_values(cur, query, [(u,) for u in urls])
+
+	conn.commit()
+	cur.close()
+	conn.close()
+
+
+def filter_new_urls(urls):
+	"""Return a list of URLs from `urls` that are not present in the
+	`url_queue` table and not already stored in `urls` table.
+
+	This performs two bulk lookups (one against `url_queue`, one against
+	`urls`) and preserves the input order while removing duplicates.
+	"""
+	if not urls:
+		return []
+
+	# preserve order and deduplicate
+	unique = list(dict.fromkeys(urls))
+
+	conn = get_conn()
+	cur = conn.cursor()
+
+	# fetch queued URLs present in input
+	cur.execute("SELECT url FROM url_queue WHERE url = ANY(%s);", (unique,))
+	queued_rows = cur.fetchall()
+	queued = set(r[0] for r in queued_rows)
+
+	# fetch already-stored URLs present in input
+	cur.execute("SELECT url FROM urls WHERE url = ANY(%s);", (unique,))
+	stored_rows = cur.fetchall()
+	stored = set(r[0] for r in stored_rows)
+
+	cur.close()
+	conn.close()
+
+	result = [u for u in unique if u not in queued and u not in stored]
+	return result
 
 # Ensure queue and logs tables are created when creating DB
 def _extend_create_database_tables(cur):
