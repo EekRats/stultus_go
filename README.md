@@ -25,6 +25,8 @@ Cool features to add:
 - [ ] - Add the ability for users to choose the weights for bigrams/trigrams/prefixes/etc, choose how the algorithm works for themselves
 - [ ] - Add Listicles like Kagi does
 - [ ] - Add blocklists (disinformation domains, marketing domains, gambling domains, malware domains) for users to set to block or a warning when a result is in the search result
+- [ ] - Add support for regex
+- [ ] - Add duckuckgo bangs
 
 Indexes to index:
 
