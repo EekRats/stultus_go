@@ -14,7 +14,7 @@ Run the file
 import scraper
 import time
 
-SLEEP_TIME = 2  # seconds between requests to avoid hammering servers
+SLEEP_TIME = 0.5  # seconds between requests to avoid hammering servers
 TIMEOUT_TIME = 10  # seconds to wait for fetching a page before skipping
 
 scraper.create_database()
