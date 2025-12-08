@@ -21,6 +21,7 @@ import tokenizer
 import psycopg2
 from psycopg2 import sql
 import psycopg2.extras as extras
+from psycopg2.extras import execute_values
 
 USER_AGENT = "SearchEngineProjectBot/1.0 (+https://github.com/ThisIsNotANamepng/search_engine; hagenjj4111@uwec.edu)"
 # export DATABASE_URL="postgres://postgres:DlIR9P2EcH3140xzJojd1B5QK50sh3FxQIxORB59hAK1U@172.233.221.151:5432/search_engine"
@@ -414,6 +415,7 @@ def pop_next_url():
 
 	# Two rows: check domain
 	first_id, first_url = rows[0]
+	
 	second_id, second_url = rows[1]
 	if get_base_domain(first_url) == get_base_domain(second_url):
 		# rotate: remove first then reinsert it so it goes to the end
@@ -460,7 +462,7 @@ def log_db(message):
 	cur.close()
 	conn.close()
 
-
+"""
 def enqueue_urls(urls):
 	conn = get_conn()
 	cur = conn.cursor()
@@ -469,7 +471,23 @@ def enqueue_urls(urls):
 	conn.commit()
 	cur.close()
 	conn.close()
+"""
+def enqueue_urls(urls):
+    conn = get_conn()
+    cur = conn.cursor()
 
+    query = """
+        INSERT INTO url_queue (url)
+        VALUES %s
+        ON CONFLICT (url) DO NOTHING;
+    """
+
+    # execute_values handles building the bulk values list efficiently
+    execute_values(cur, query, [(u,) for u in urls])
+
+    conn.commit()
+    cur.close()
+    conn.close()
 
 # Ensure queue and logs tables are created when creating DB
 def _extend_create_database_tables(cur):

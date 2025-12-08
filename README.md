@@ -4,7 +4,7 @@
 
 We're building a search engine!
 
-Just for fun, to learn about how web crawling, tokenizing, databases, all that works in a real project.
+Just for fun, to learn about how web crawling, tokenizing, databases, server hardware, all that works in a real project.
 
 Just to build something cool
 
@@ -15,6 +15,8 @@ Todo:
 - [x] - Scoring
 - [ ] - Web crawling
 - [ ] - Come up with a name
+- [ ] - Strip ?data from urls when indexed
+- [ ] - Right now the scrapers have a severe performance degredation, I need to fix that
 
 Cool features to add:
 
