@@ -2,41 +2,43 @@
 
 import tokenizer
 import scraper
-import sqlite3
 import time
 
-DATABASE_PATH = "database.db"
 
 def search(query):
+    """Run search against the Postgres DB via `scraper.get_conn()`.
 
-    connection = sqlite3.connect(DATABASE_PATH)
-    cursor = connection.cursor()
-    weights = cursor.execute("SELECT * FROM weights;").fetchall()
-    
+    Uses array parameters with `ANY(%s)` so empty token groups are handled safely.
+    """
+    conn = scraper.get_conn()
+    cur = conn.cursor()
 
-    print(weights)
-    word_weight = (weights[0][1])
-    bigram_weight = (weights[1][1])
-    trigram_weight = (weights[2][1])
-    prefix_weight = (weights[3][1])
+    # Fetch weights by type to avoid relying on ordering
+    cur.execute("SELECT weight FROM weights WHERE type = %s;", ("word",))
+    word_weight = cur.fetchone()[0]
+    cur.execute("SELECT weight FROM weights WHERE type = %s;", ("bigram",))
+    bigram_weight = cur.fetchone()[0]
+    cur.execute("SELECT weight FROM weights WHERE type = %s;", ("trigram",))
+    trigram_weight = cur.fetchone()[0]
+    cur.execute("SELECT weight FROM weights WHERE type = %s;", ("prefix",))
+    prefix_weight = cur.fetchone()[0]
 
     tokenized = tokenizer.tokenize_all(query)
 
-    # Build placeholder groups
-    word_q = ",".join(["?"] * len(tokenized[0]))
-    bigram_q = ",".join(["?"] * len(tokenized[1]))
-    trigram_q = ",".join(["?"] * len(tokenized[2]))
-    prefix_q = ",".join(["?"] * len(tokenized[3]))
+    # Ensure lists (psycopg2 will adapt Python lists to SQL arrays)
+    words = list(tokenized[0]) if tokenized and len(tokenized) > 0 else []
+    bigrams = list(tokenized[1]) if tokenized and len(tokenized) > 1 else []
+    trigrams = list(tokenized[2]) if tokenized and len(tokenized) > 2 else []
+    prefixes = list(tokenized[3]) if tokenized and len(tokenized) > 3 else []
 
-    sql_query = f"""
+    sql_query = """
     WITH scores AS (
         -- Words
         SELECT url_id,
-            COUNT(*) * {word_weight} AS score
+            COUNT(*) * %s AS score
         FROM word_urls
         WHERE word_id IN (
-            SELECT id FROM words
-            WHERE word IN ({word_q})
+            SELECT id FROM words WHERE word = ANY(%s)
         )
         GROUP BY url_id
 
@@ -44,11 +46,10 @@ def search(query):
 
         -- Bigrams
         SELECT url_id,
-            COUNT(*) * {bigram_weight} AS score
+            COUNT(*) * %s AS score
         FROM bigram_urls
         WHERE bigram_id IN (
-            SELECT id FROM bigrams
-            WHERE bigram IN ({bigram_q})
+            SELECT id FROM bigrams WHERE bigram = ANY(%s)
         )
         GROUP BY url_id
 
@@ -56,11 +57,10 @@ def search(query):
 
         -- Trigrams
         SELECT url_id,
-            COUNT(*) * {trigram_weight} AS score
+            COUNT(*) * %s AS score
         FROM trigram_urls
         WHERE trigram_id IN (
-            SELECT id FROM trigrams
-            WHERE trigram IN ({trigram_q})
+            SELECT id FROM trigrams WHERE trigram = ANY(%s)
         )
         GROUP BY url_id
 
@@ -68,11 +68,10 @@ def search(query):
 
         -- Prefixes
         SELECT url_id,
-            COUNT(*) * {prefix_weight} AS score
+            COUNT(*) * %s AS score
         FROM prefix_urls
         WHERE prefix_id IN (
-            SELECT id FROM prefixes
-            WHERE prefix IN ({prefix_q})
+            SELECT id FROM prefixes WHERE prefix = ANY(%s)
         )
         GROUP BY url_id
     )
@@ -81,30 +80,31 @@ def search(query):
         SUM(score) AS score
     FROM scores
     JOIN urls ON urls.id = scores.url_id
-    GROUP BY urls.id
+    GROUP BY urls.id, urls.url
     ORDER BY score DESC
     LIMIT 10;
     """
 
-    # Same params order as before, just concatenated
     params = (
-        tokenized[0] +
-        list(tokenized[1]) +
-        list(tokenized[2]) +
-        list(tokenized[3])
+        word_weight, words,
+        bigram_weight, bigrams,
+        trigram_weight, trigrams,
+        prefix_weight, prefixes,
     )
 
-    results = cursor.execute(sql_query, params).fetchall()
+    print("Searching....")
+    start = time.time()
+    cur.execute(sql_query, params)
+    print(time.time()-start)
+    results = cur.fetchall()
 
     print(results)
 
-    connection.close()
+    cur.close()
+    conn.close()
 
 
-#query=input("Search query: ")
-#query = "How do I hack a website"
-#search(query)
-
-#import os
-#os.system("rm database.db")
-create_database()
+# Example usage:
+# query = input("Search query: ")
+query = "Nicklas Lidstrom hockey"
+search(query)

@@ -13,8 +13,9 @@ Run the file
 
 import scraper
 import time
+import urllib.parse
 
-SLEEP_TIME = 0.5  # seconds between requests to avoid hammering servers
+#SLEEP_TIME = 10  # seconds between requests to avoid hammering servers. Replacing this with domain-specific sleep times
 TIMEOUT_TIME = 10  # seconds to wait for fetching a page before skipping
 
 scraper.create_database()
@@ -41,7 +42,6 @@ while True:
     #timed = time.time()
     
     url = scraper.pop_next_url()
-    scraper.log(f"Starting scraping {url}")
     #print(2, time.time()-timed)
     #timed = time.time()
 
@@ -50,8 +50,10 @@ while True:
         if scraper.queue_size() == 0:
             break
         else:
-            time.sleep(SLEEP_TIME)
+            #time.sleep(SLEEP_TIME)
             continue
+
+    scraper.log(f"Starting scraping {url}")
     #print(3, time.time()-timed)
     #timed = time.time()
 
@@ -74,7 +76,9 @@ while True:
 
         seen = set()
         cleaned = []
+
         for link in raw_links:
+            # Get rid of ?post=data
             total_links += 1
             clean_link = link.split('?', 1)[0]
             if clean_link not in seen:
@@ -106,6 +110,6 @@ while True:
         print(f"Scraped {total_scraped} pages. {scraper.queue_size()} URLs left in queue")
     print(f"Scraped {total_scraped} pages. {scraper.queue_size()} URLs left in queue", time.time()-start)
 
-    time.sleep(SLEEP_TIME)
+    #time.sleep(SLEEP_TIME)
 
 scraper.log("Finished scraping")

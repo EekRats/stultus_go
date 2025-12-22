@@ -22,6 +22,8 @@ import psycopg2
 from psycopg2 import sql
 import psycopg2.extras as extras
 from psycopg2.extras import execute_values
+from langdetect import detect
+import signal
 
 USER_AGENT = "SearchEngineProjectBot/1.0 (+https://github.com/ThisIsNotANamepng/search_engine; hagenjj4111@uwec.edu)"
 
@@ -30,6 +32,8 @@ def get_conn():
     database_url = os.getenv("DATABASE_URL")
     if database_url:
         return psycopg2.connect(database_url)
+    else:
+        print("Failed to connect to server")
 
     #return psycopg2.connect(host=host, port=port, user=user, password=password, dbname=dbname)
 
@@ -83,7 +87,6 @@ def create_database():
 
     set_default_weights()
 
-
 def set_default_weights():
     conn = get_conn()
     cur = conn.cursor()
@@ -110,9 +113,9 @@ def set_default_weights():
     cur.close()
     conn.close()
 
-
 def exists(text, type_):
-    # Keep function for compatibility but prefer upserts/bulk operations.
+    # Keep function for compatibility but prefer upserts/bulk operations
+    # Not used anymore
     conn = get_conn()
     cur = conn.cursor()
 
@@ -137,8 +140,7 @@ def exists(text, type_):
     conn.close()
     return found
 
-
-# HTML text extraction utilities (copied from original file)
+# HTML text extraction utilities
 def tag_visible(element):
     if element.parent.name in ["style", "script", "head", "title", "meta", "[document]"]:
         return False
@@ -146,23 +148,35 @@ def tag_visible(element):
         return False
     return True
 
-
 def text_from_html(body, url):
-    soup = BeautifulSoup(body, "html.parser")
-    texts = soup.find_all(string=True)
-    visible_texts = filter(tag_visible, texts)
+    # Use lxml parser for speed
+    soup = BeautifulSoup(body, "lxml")
 
-    links = []
+    # Remove tags that are not relevant for visible text
+    for tag in soup(["script", "style", "head", "meta", "noscript"]):
+        tag.decompose()
 
+    # Prepare base URL for relative links
     parsed = urlparse(url)
     base_url = f"{parsed.scheme}://{parsed.netloc}"
 
-    for link in soup.find_all("a", href=True):
-        full_url = urljoin(base_url, link["href"])
-        links.append(full_url)
+    texts = []
+    links = []
 
-    return [u" ".join(t.strip() for t in visible_texts), links]
+    # Single tree traversal for both text and links
+    for element in soup.descendants:
+        if element.name == "a" and element.has_attr("href"):
+            links.append(urljoin(base_url, element["href"]))
+        elif isinstance(element, str):
+            # Only collect non-whitespace text
+            t = element.strip()
+            if t:
+                texts.append(t)
 
+    # Join all text fragments into one string
+    combined_text = " ".join(texts)
+
+    return combined_text, links
 
 def allowed_by_robots(url, user_agent):
         
@@ -198,8 +212,12 @@ def get_main_text(url, timeout=None):
     On network errors or timeouts, returns empty text and empty links list.
     """
 
+    def handler(signum, frame):
+        print("FIRED")
+        log(f"URL took too long to download")
+
     if not allowed_by_robots(url, USER_AGENT):
-        log(f"Blocked by robots.txt: {url}")
+        log(f"{url}Blocked by robots.txt")
         return "", []
 
     headers = {
@@ -207,14 +225,36 @@ def get_main_text(url, timeout=None):
         "From": "hagenjj4111@uwec.edu"
     }
 
-    try:
-        r = requests.get(url, headers=headers, timeout=timeout)
-    except requests.exceptions.RequestException as e:
-        log(f"HTTP error fetching {url}: {e}")
-        return "", []
-    
-    return text_from_html(r.content, url)
+    signal.signal(signal.SIGALRM, handler)
+    signal.alarm(timeout)
 
+    try:
+        r = requests.get(url, headers=headers, timeout=(5, 10))
+
+        content_type = r.headers.get("Content-Type", "").lower()
+
+        # Check for text and pdf only
+        if not content_type.startswith("text/") and not content_type == "application/pdf":
+            log(f"{url} Invalid data type")
+            return False
+        
+
+        # Check for concerning http error codes
+
+        content = r.content
+            
+    except TimeoutError:
+        log(f"{url} Total timeout exceeded")
+        return False
+    except requests.exceptions.RequestException as e:
+        log(f"{url} HTTP error fetching: {e}")
+        return "", []
+    finally:
+        print(5)
+        signal.alarm(0)
+
+    
+    return text_from_html(content, url)
 
 def log(message):
     # write to local file
@@ -253,18 +293,33 @@ def get_base_domain(url):
 
 
 def store(url, timeout=None):
-    """Store the page at `url` and return discovered links.
+    """
+    Store the page at `url` and return discovered links.
 
     If `timeout` is provided it is forwarded to HTTP fetch.
     """    
-    text, links = get_main_text(url, timeout=timeout)
+
+    content = get_main_text(url, timeout=timeout)
+    if content != False:
+        # The url contains real text to scrape
+        text = content[0]
+        links = content[1]
+    else:
+        # Url is a file format which cannot be scraped
+        return
+
+
+    # Check for english language
+    if detect(text) != 'en':
+        log(f"{url} Not in English")
+        return links
 
     tokens = tokenizer.tokenize_all(text)
 
     if not text:
-        log("Failed to retrieve article text.")
+        log(f"{url}Failed to retrieve page text")
         return links
-    
+        
 
     # tokens: [words, bigrams, trigrams, prefixes]
     words = set(tokens[0]) if tokens and len(tokens) > 0 else set()
@@ -494,6 +549,7 @@ def get_host_ip():
 
 def log_db(message):
     """Insert a log message into the `logs` table with timestamp and host IP."""
+    #start=time.time()
     conn = get_conn()
     cur = conn.cursor()
     ip = get_host_ip()
@@ -501,6 +557,7 @@ def log_db(message):
     conn.commit()
     cur.close()
     conn.close()
+    #print("DB Log time:", time.time()-start)
 
 """
 def enqueue_urls(urls):
