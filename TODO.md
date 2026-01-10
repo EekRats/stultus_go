@@ -21,11 +21,15 @@ Todo:
 - [ ] Sending data to the database should spawn a new process instead of waiting for the database transaction to finish
 - [ ] Wikipedia is under strain due to AI crawlers, manually download the wikipedia from Wikimedia dumps and scrape the local dump instead of scraping
 - [ ] Handle scraping pdf files
+- [ ] Handle urls which redirect to another (probably just resolve all urls) (for example https://woo.app)
+- [ ] Still tries to scrape image files, fix that
 
 ## Database
 
 - [ ] Switch to a postgres cluster
 - [ ] Optimize searching
+- [ ] Enter urls into queue with delay for scraping
+- [ ] Set up Redis DB for domain scraping cooldown
 
 ## Hardware
 
@@ -51,4 +55,6 @@ Todo:
 - [ ] Add an option to only include domains which have appeared in hacker news (https://www.kaggle.com/datasets/hacker-news/hacker-news)
 - [ ] Add an option to only search Kagi Smallweb
 - [ ] Add categorizing of domains in search and/or in the scraping progress dashboard [https://domainsproject.org/dataset](https://domainsproject.org/dataset)
-- [ ] host the search over DNS. Something very similar was done with Wikipedia summaries, [https://dgl.cx/2008/10/wikipedia-summary-dns](https://dgl.cx/2008/10/wikipedia-summary-dns) you can have a domain name be the search query and have a super optimized dns response with the results
+- [ ] Host the search over DNS. Something very similar was done with Wikipedia summaries, [https://dgl.cx/2008/10/wikipedia-summary-dns](https://dgl.cx/2008/10/wikipedia-summary-dns) you can have a domain name be the search query and have a super optimized dns response with the results
+- [ ] Could classify text for each page with sentiment analysis
+- [ ] Add onion site

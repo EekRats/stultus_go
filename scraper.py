@@ -116,6 +116,9 @@ def set_default_weights():
 def exists(text, type_):
     # Keep function for compatibility but prefer upserts/bulk operations
     # Not used anymore
+
+    # Returns true if token has been used in the database, false if it's new
+
     conn = get_conn()
     cur = conn.cursor()
 
@@ -213,11 +216,10 @@ def get_main_text(url, timeout=None):
     """
 
     def handler(signum, frame):
-        print("FIRED")
-        log(f"URL took too long to download")
+        log(f"Error URL took too long to download {url}")
 
     if not allowed_by_robots(url, USER_AGENT):
-        log(f"{url}Blocked by robots.txt")
+        log(f"Blocked by robots.txt {url}")
         return "", []
 
     headers = {
@@ -235,7 +237,7 @@ def get_main_text(url, timeout=None):
 
         # Check for text and pdf only
         if not content_type.startswith("text/") and not content_type == "application/pdf":
-            log(f"{url} Invalid data type")
+            log(f"Error Invalid data type {url}")
             return False
         
 
@@ -244,23 +246,33 @@ def get_main_text(url, timeout=None):
         content = r.content
             
     except TimeoutError:
-        log(f"{url} Total timeout exceeded")
+        log(f"Error Total timeout exceeded {url}")
         return False
     except requests.exceptions.RequestException as e:
-        log(f"{url} HTTP error fetching: {e}")
+        log(f"Error HTTP error fetching: {url} : {e}")
         return "", []
     finally:
-        print(5)
+        #print(5)
         signal.alarm(0)
 
     
     return text_from_html(content, url)
 
 def log(message):
+    """
+    Logs the message in the database logs
+
+    Logs must be in this format:
+    - Errors: Error {error message} {url}
+    - Scraped: Scraped {url}
+    - Misc: Misc {message} {url}
+
+    This is for measuring success/error rate in the dashboard
+    """
     # write to local file
-    with open("scraper.log", "a") as f:
-        f.write(str(time.time()) + ": " + message + "\n")
-    # attempt to write to DB logs table; don't raise if DB unavailable
+    #with open("scraper.log", "a") as f:
+    #    f.write(str(time.time()) + ": " + message + "\n")
+    # Write to database logs
     try:
         log_db(message)
     except Exception:
@@ -297,9 +309,15 @@ def store(url, timeout=None):
     Store the page at `url` and return discovered links.
 
     If `timeout` is provided it is forwarded to HTTP fetch.
-    """    
+    """
+    #print("Starting storing")
+    m=time.time()
 
     content = get_main_text(url, timeout=timeout)
+
+    #print(f"Getting main text: {time.time()-m}")
+    m=time.time()
+
     if content != False:
         # The url contains real text to scrape
         text = content[0]
@@ -308,16 +326,26 @@ def store(url, timeout=None):
         # Url is a file format which cannot be scraped
         return
 
+    #print(f"Spliting text: {time.time()-m}")
+    m=time.time()
+
 
     # Check for english language
     if detect(text) != 'en':
-        log(f"{url} Not in English")
+        log(f"Language Not in English {url}")
         return links
 
-    tokens = tokenizer.tokenize_all(text)
+    #print(f"Detecting language: {time.time()-m}")
+    m=time.time()
+
+
+    tokens = tokenizer.tokenize_all(text) #TODO: I want to see how expensive it is to check if each token is in the database already, you'd have to search all of the tokens to find if it's in the database
+
+    #print(f"Geeting tokens: {time.time()-m}")
+    m=time.time()
 
     if not text:
-        log(f"{url}Failed to retrieve page text")
+        log(f"Error Failed to retrieve page text {url}")
         return links
         
 
@@ -327,8 +355,16 @@ def store(url, timeout=None):
     trigrams = set(tokens[2]) if tokens and len(tokens) > 2 else set()
     prefixes = set(tokens[3]) if tokens and len(tokens) > 3 else set()
 
+    #print(f"Splitting into words, bigrams, trigrams, prefixes: {time.time()-m}")
+    m=time.time()
+
+
     conn = get_conn()
     cur = conn.cursor()
+
+    #print(f"Getting SQL connection and cursor: {time.time()-m}")
+    m=time.time()
+
 
     # Upsert the URL and get its id. Use RETURNING id when inserting; else SELECT.
     cur.execute("INSERT INTO urls (url) VALUES (%s) ON CONFLICT (url) DO NOTHING RETURNING id;", (url,))
@@ -374,17 +410,28 @@ def store(url, timeout=None):
         ), (list(items),))
         rows = cur.fetchall()
         return {val: id for (id, val) in rows}
+    
+    #print(f"Putting tokens into database: {time.time()-m}")
+    m=time.time()
+
 
     word_map = fetch_id_map('word', 'words', list(words))
     bigram_map = fetch_id_map('bigram', 'bigrams', list(bigrams))
     trigram_map = fetch_id_map('trigram', 'trigrams', list(trigrams))
     prefix_map = fetch_id_map('prefix', 'prefixes', list(prefixes))
 
+    #print(f"Making token maps: {time.time()-m}")
+    m=time.time()
+
+
     # Prepare mapping inserts and bulk insert them
     word_url_pairs = [(word_map[w], url_id) for w in words if w in word_map]
     bigram_url_pairs = [(bigram_map[b], url_id) for b in bigrams if b in bigram_map]
     trigram_url_pairs = [(trigram_map[t], url_id) for t in trigrams if t in trigram_map]
     prefix_url_pairs = [(prefix_map[p], url_id) for p in prefixes if p in prefix_map]
+
+    #print(f"Making inserts: {time.time()-m}")
+    m=time.time()
 
     if word_url_pairs:
         extras.execute_values(cur,
@@ -406,9 +453,16 @@ def store(url, timeout=None):
             "INSERT INTO prefix_urls (prefix_id, url_id) VALUES %s;",
             prefix_url_pairs)
 
+    #print(f"SQL executing token_urls: {time.time()-m}")
+    m=time.time()
+
+
     conn.commit()
     cur.close()
     conn.close()
+
+    #print(f"Committing and closing sql connection: {time.time()-m}")
+    m=time.time()
 
     return links
 
@@ -465,6 +519,30 @@ def queue_size():
     conn.close()
     return count
 
+def get_next_urls(num_urls):
+    # Returns a list of the next urls in the queue, deletes them from the db queue
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("SELECT id, url FROM url_queue ORDER BY id LIMIT %s;", (num_urls,))
+    rows = cur.fetchall()
+
+    ids = [row[0] for row in rows]
+    urls = [row[1] for row in rows]
+
+    # Nothing in the queue
+    if not rows:
+        cur.close()
+        conn.close()
+        return None
+
+    cur.execute("DELETE FROM url_queue WHERE id = ANY(%s);", (ids,))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return urls
 
 def pop_next_url():
     """
@@ -654,3 +732,19 @@ def _extend_create_database_tables(cur):
     );
     """)
 
+
+# ------------ Redis functions
+
+def mark_domain(domain, redis_client):
+    # Marks domain as scraped
+
+    key = f"domain:{domain}"
+    # SET key with NX (only if not exists) and EX (expire)
+    redis_client.set(key, 1, nx=True, ex=10)
+
+def domain_free_for_scraping(domain, redis_client):
+    # Checks if domain has been scrpaed in the last 10 seconds
+    # True for not in db and can be scraped, False for not
+
+    key = f"domain:{domain}"
+    return not redis_client.exists(key)
