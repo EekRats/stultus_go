@@ -23,13 +23,15 @@ Todo:
 - [ ] Handle scraping pdf files
 - [ ] Handle urls which redirect to another (probably just resolve all urls) (for example https://woo.app)
 - [ ] Still tries to scrape image files, fix that
+- [ ]
 
 ## Database
 
 - [ ] Switch to a postgres cluster
+- [ ] Research distributed sql instead of postgres clusters
 - [ ] Optimize searching
 - [ ] Enter urls into queue with delay for scraping
-- [ ] Set up Redis DB for domain scraping cooldown
+- [x] Set up Redis DB for domain scraping cooldown
 
 ## Hardware
 
