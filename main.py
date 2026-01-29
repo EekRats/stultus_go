@@ -30,7 +30,7 @@ def search(query):
     trigrams = list(tokenized[2]) if tokenized and len(tokenized) > 2 else []
     prefixes = list(tokenized[3]) if tokenized and len(tokenized) > 3 else []
 
-    # I changed it to rate based on number of token occurences divided by total tokens on url, we might want to change this in the future
+    # I changed this to rate based on number of token occurences divided by total tokens on url, we might want to change this in the future
     sql_query = """
     WITH scores AS (
         -- Words

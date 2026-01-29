@@ -2,11 +2,6 @@
 
 (Update it with the progres you've made, add whatever you need to)
 
-## Frontend
-
-- [ ] Make frontend
-- [ ] Connect frontend to database
-
 ## Web Crawling
 
 - [ ] Add checks for html pages only
@@ -15,8 +10,8 @@
     - [ ] Add checks for stalled scraping, reporting to the dashboard
 - [ ] Come up with more chracteristics about scraped domains to store and use in search algorithm
 - [ ] Make rock-solid domain wait times, don't hit a domain accross all scrapers in less than 5 seconds
-- [ ] Respect 403/429 responses and stop crawling the domain
-- [ ] Look for and respect Crawl-Delay
+- [ ] **Respect 400/500 error responses and stop crawling the domain**
+- [ ] Look for and respect Crawl-Delay in robots.txt
 - [ ] Should report http reponses to local lookup table and therefore the index database
 - [ ] Sending data to the database should spawn a new process instead of waiting for the database transaction to finish
 - [ ] Wikipedia is under strain due to AI crawlers, manually download the wikipedia from Wikimedia dumps and scrape the local dump instead of scraping
@@ -34,7 +29,7 @@
 
 ## Hardware
 
-- [ ] Figure out the hardware
+- [x] Figure out the hardware
 
 ## Dashboard
 
@@ -47,7 +42,8 @@
 - [ ] Make a config system for new scrapers to pull from, possily integrate with k8?
 - [ ] Make a web page or about page + email address on Github to for abuse complaints
 - [x] Come up wth a name
-- [ ] Need to add language detection somewhere, only scrape English?
+- [ ] Need to add language detection somewhere, only scrape English? Or we could translate pages on the hpc and serve up the translated versions
+- [ ] Need to save the raw text of pages so we can do analysis and research on it later
 
 ## Cool Things to Add
 
